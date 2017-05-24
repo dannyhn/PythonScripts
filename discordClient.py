@@ -1,8 +1,11 @@
 import urllib.request
 import json
+import zlib
+
 
 def clientGet(url):
-	return urllib.request.urlopen(url).read()
+	req = urllib.request.Request(url, headers=getHeaders())
+	return urllib.request.urlopen(req).read()
 
 def clientPost(url, data):
 	parsedData = json.dumps(data).encode('utf8')
@@ -13,6 +16,9 @@ def clientPostMessage(url, msg):
 	req = urllib.request.Request(url, data=msg.toJson(), headers=getHeaders())
 	urllib.request.urlopen(req)
 
+def decodeGzip(msg):
+	return zlib.decompress(msg, 16+zlib.MAX_WBITS).decode("utf8")
+
 def getHeaders():
 	headers = {}
 	headers["content-type"] = "application/json"
@@ -21,9 +27,29 @@ def getHeaders():
 	headers["accept-language"] = "en-US"
 	headers["authority"] = "discordapp.com"
 	headers["user-agent"] = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) discord/0.0.297 Chrome/53.0.2785.143 Discord/1.4.12 Safari/537.36"
-	headers["referer"] = "https://discordapp.com/channels/267715169520582657/272172570609188864" #dynamic
-	headers["authorization"] = "MjA5MTcxNjYwMjI0NDYyODU5.DAV_Nw.BjpqzTbhutbtnYskMUq1PRTCLX8" #dynamic
+	#headers["referer"] = "https://discordapp.com/channels/267715169520582657/272172570609188864" #dynamic
+	headers["authorization"] = "MTYxNjM4MDUwNzMwODY4NzQ3.DAZfmQ.ie2zUmBT66LqxH--3IW1HenaL_g" #dynamic, change to change user
 	return headers
+
+def getGuilds():
+	guildsUrl = "https://discordapp.com/api/v6/users/@me/guilds"
+	guildsString = decodeGzip(clientGet(guildsUrl))
+	guildsList = json.loads(guildsString)
+	guildMapList = []
+	for guild in guildsList:
+		guildMapList.append(Guild(guild))
+	return guildMapList
+
+def getChannels(guild):
+	channelsUrl = "https://discordapp.com/api/v6/guilds/{}/channels".format(guild.getId())
+	channelString = decodeGzip(clientGet(channelsUrl))
+	channelList = json.loads(channelString)
+	channelMapList = []
+	for channel in channelList:
+		if ("last_message_id" in channel): # if text channel
+			channelMapList.append(Channel(channel))
+	return channelMapList
+
 
 #print(clientGet("http://localhost:6565/getChannels"))
 
@@ -48,4 +74,39 @@ class Message:
 		messageMap["tts"] = self._tts
 		return json.dumps(messageMap).encode("utf8")
 
-clientPostMessage("https://discordapp.com/api/v6/channels/272172570609188864/messages", Message("mymessage", "", False))
+class Guild:
+
+	def __init__(self, dict):
+		self._owner = dict["owner"]
+		self._permissions = dict["permissions"]
+		self._icon = dict["icon"]
+		self._id = dict["id"]
+		self._name = dict["name"]
+
+	def getId(self):
+		return self._id
+
+	def getName(self):
+		return self._name
+
+class Channel:
+
+	def __init__(self, dict):
+		self._guildId = dict["guild_id"]
+		self._name = dict["name"]
+		self._id = dict["id"]
+
+	def getId(self):
+		return self._id
+
+	def getName(self):
+		return self._name
+
+	def getGuildId(self):
+		return self._guildId
+
+
+for channel in getChannels(getGuilds()[0]):
+	print(channel.getName())
+#clientPostMessage("https://discordapp.com/api/v6/channels/316728454647250944/messages", Message("newMessage", "", False))
+#clientPostMessage("https://discordapp.com/api/v6/channels/272172570609188864/messages", Message("mymessage", "", False))
