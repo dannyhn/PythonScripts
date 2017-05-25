@@ -3,23 +3,19 @@ import json
 import zlib
 
 
-def clientGet(url):
-	req = urllib.request.Request(url, headers=getHeaders())
+def clientGet(url, token):
+	req = urllib.request.Request(url, headers=getHeaders(token))
 	return urllib.request.urlopen(req).read()
 
-def clientPost(url, data):
-	parsedData = json.dumps(data).encode('utf8')
-	req = urllib.request.Request(url, data=parsedData, headers={'content-type': 'application/json'})
-	urllib.request.urlopen(req)
-
-def clientPostMessage(url, msg):
-	req = urllib.request.Request(url, data=msg.toJson(), headers=getHeaders())
+def clientPost(url, msg, token):
+	req = urllib.request.Request(url, data=msg.toJson(), headers=getHeaders(token))
 	return urllib.request.urlopen(req).read()
+
 
 def decodeGzip(msg):
 	return zlib.decompress(msg, 16+zlib.MAX_WBITS).decode("utf8")
 
-def getHeaders():
+def getHeaders(token):
 	headers = {}
 	headers["content-type"] = "application/json"
 	headers["origin"] = "https://discordapp.com"
@@ -27,10 +23,10 @@ def getHeaders():
 	headers["accept-language"] = "en-US"
 	headers["authority"] = "discordapp.com"
 	headers["user-agent"] = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) discord/0.0.297 Chrome/53.0.2785.143 Discord/1.4.12 Safari/537.36"
-	#headers["referer"] = "https://discordapp.com/channels/267715169520582657/272172570609188864" #dynamic
-	headers["authorization"] = "MTYxNjM4MDUwNzMwODY4NzQ3.DAZfmQ.ie2zUmBT66LqxH--3IW1HenaL_g" #dynamic, change to change user
+	if token != None:
+		headers["authorization"] = token
 	return headers
-
+'''
 def getGuilds():
 	guildsUrl = "https://discordapp.com/api/v6/users/@me/guilds"
 	guildsString = decodeGzip(clientGet(guildsUrl))
@@ -55,7 +51,7 @@ def getAuthorization(email, password):
 	tokenString = decodeGzip(clientPostMessage(url, Login(email, password)))
 	token = json.loads(tokenString)["token"]
 	return token
-
+'''
 
 
 #print(clientGet("http://localhost:6565/getChannels"))
@@ -108,11 +104,11 @@ class Guild:
 	def getName(self):
 		return self._name
 
-	def getChannels(self):
+	def getChannels(self, token):
 		if (self._channels != None):
 			return self._channels
 		channelsUrl = "https://discordapp.com/api/v6/guilds/{}/channels".format(self.getId())
-		channelString = decodeGzip(clientGet(channelsUrl))
+		channelString = decodeGzip(clientGet(channelsUrl, token))
 		channelList = json.loads(channelString)
 		channelMapList = []
 		for channel in channelList:
@@ -121,8 +117,8 @@ class Guild:
 		self._channels = channelMapList
 		return self._channels
 
-	def getChannelByName(self, name):
-		for channel in self.getChannels():
+	def getChannelByName(self, name, token):
+		for channel in self.getChannels(token):
 			if channel.getName() == name:
 				return channel
 
@@ -144,11 +140,60 @@ class Channel:
 	def getGuildId(self):
 		return self._guildId
 
-	def sendMessage(self, msg):
+	def sendMessage(self, msg, token):
 		url = "https://discordapp.com/api/v6/channels/{}/messages".format(self.getId())
-		clientPostMessage(url, Message(msg, "", False))
+		clientPost(url, Message(msg, "", False), token)
 
+class Client:
 
+	def __init__(self, email, password):
+		self.token = self._getAuthorization(email, password)
+		self.guilds = self._getGuilds(self.token)
+
+	def getServerNames(self):
+		ls = []
+		for guild in self.guilds:
+			ls.append(guild.getName())
+		return ls
+
+	def getServerByName(self, name):
+		for guild in self.guilds:
+			if guild.getName() == name:
+				return guild
+
+	def getChannelNames(self, guild):
+		ls = []
+		for channel in guild.getChannels(self.token):
+			ls.append(channel.getName())
+		return ls
+
+	def getChannelByName(self, guild, name):
+		for channel in guild.getChannels(self.token):
+			if channel.getName() == name:
+				return channel
+
+	def sendMessageToChannel(self, channel, msg):
+		if msg != "":
+			channel.sendMessage(msg, self.token)
+
+	def _getAuthorization(self, email, password):
+		url = "https://discordapp.com/api/v6/auth/login"
+		tokenString = decodeGzip(clientPost(url, Login(email, password), None))
+		token = json.loads(tokenString)["token"]
+		return token
+
+	def _getGuilds(self, token):
+		guildsUrl = "https://discordapp.com/api/v6/users/@me/guilds"
+		guildsString = decodeGzip(clientGet(guildsUrl, token))
+		guildsList = json.loads(guildsString)
+		guildMapList = []
+		for guild in guildsList:
+			guildMapList.append(Guild(guild))
+		return guildMapList
+
+#server = client.getServerByName("Teamspeak")
+#channel = client.getChannelByName(server, "programming")
+#client.sendMessageToChannel(channel, "hello world 2")
 #guild = getGuilds()[0]
 #guild.getChannelByName("programming").sendMessage("does ")
 
