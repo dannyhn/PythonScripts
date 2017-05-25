@@ -14,7 +14,7 @@ def clientPost(url, data):
 
 def clientPostMessage(url, msg):
 	req = urllib.request.Request(url, data=msg.toJson(), headers=getHeaders())
-	urllib.request.urlopen(req)
+	return urllib.request.urlopen(req).read()
 
 def decodeGzip(msg):
 	return zlib.decompress(msg, 16+zlib.MAX_WBITS).decode("utf8")
@@ -50,6 +50,13 @@ def getChannels(guild):
 			channelMapList.append(Channel(channel))
 	return channelMapList
 
+def getAuthorization(email, password):
+	url = "https://discordapp.com/api/v6/auth/login"
+	tokenString = decodeGzip(clientPostMessage(url, Login(email, password)))
+	token = json.loads(tokenString)["token"]
+	return token
+
+
 
 #print(clientGet("http://localhost:6565/getChannels"))
 
@@ -59,6 +66,17 @@ def getChannels(guild):
 
 #curl -H "Content-Type: application/json" -X POST -d '{"message": "asd", "channel": "315951206142967818"}' localhost:6565/message
 #curl -H "Content-Type: application/json" -X POST -d '{"guild":null,"guildId":null,"user":"Danny","userId":"209171660224462859","channel":null,"channelId":null,"timestamp":1495400351359,"message":"b"}' localhost:6565/messageUser
+
+class Login:
+	def __init__(self, email, password):
+		self._email = email
+		self._password = password
+
+	def toJson(self):
+		loginMap = {}
+		loginMap["email"] = self._email
+		loginMap["password"] = self._password
+		return json.dumps(loginMap).encode("utf8")
 
 class Message:
 
@@ -82,12 +100,33 @@ class Guild:
 		self._icon = dict["icon"]
 		self._id = dict["id"]
 		self._name = dict["name"]
+		self._channels = None
 
 	def getId(self):
 		return self._id
 
 	def getName(self):
 		return self._name
+
+	def getChannels(self):
+		if (self._channels != None):
+			return self._channels
+		channelsUrl = "https://discordapp.com/api/v6/guilds/{}/channels".format(self.getId())
+		channelString = decodeGzip(clientGet(channelsUrl))
+		channelList = json.loads(channelString)
+		channelMapList = []
+		for channel in channelList:
+			if ("last_message_id" in channel): # if text channel
+				channelMapList.append(Channel(channel))
+		self._channels = channelMapList
+		return self._channels
+
+	def getChannelByName(self, name):
+		for channel in self.getChannels():
+			if channel.getName() == name:
+				return channel
+
+
 
 class Channel:
 
@@ -105,8 +144,17 @@ class Channel:
 	def getGuildId(self):
 		return self._guildId
 
+	def sendMessage(self, msg):
+		url = "https://discordapp.com/api/v6/channels/{}/messages".format(self.getId())
+		clientPostMessage(url, Message(msg, "", False))
 
-for channel in getChannels(getGuilds()[0]):
-	print(channel.getName())
+
+#guild = getGuilds()[0]
+#guild.getChannelByName("programming").sendMessage("does ")
+
+#for channel in getChannels(getGuilds()[0]):
+#	if channel.getName() == "general":
+#		channel.sendMessage("testing")
+#	print(channel.getName())
 #clientPostMessage("https://discordapp.com/api/v6/channels/316728454647250944/messages", Message("newMessage", "", False))
 #clientPostMessage("https://discordapp.com/api/v6/channels/272172570609188864/messages", Message("mymessage", "", False))
