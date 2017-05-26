@@ -122,7 +122,11 @@ class Guild:
 			if channel.getName() == name:
 				return channel
 
-
+class ChannelMessage:
+	def __init__(self, dict):
+		self.id = dict["id"]
+		self.name = dict["author"]["username"]
+		self.content = dict["content"]
 
 class Channel:
 
@@ -130,6 +134,7 @@ class Channel:
 		self._guildId = dict["guild_id"]
 		self._name = dict["name"]
 		self._id = dict["id"]
+		self._oldMessages = set()
 
 	def getId(self):
 		return self._id
@@ -143,6 +148,21 @@ class Channel:
 	def sendMessage(self, msg, token):
 		url = "https://discordapp.com/api/v6/channels/{}/messages".format(self.getId())
 		clientPost(url, Message(msg, "", False), token)
+
+	def getMessages(self, token):
+		url = "https://discordapp.com/api/v6/channels/{}/messages?limit=20".format(self.getId())
+		messageString = decodeGzip(clientGet(url, token))
+		messageList = json.loads(messageString)
+		messagesToReturn = []
+		for message in messageList:
+			current = ChannelMessage(message)
+			if not current.id in self._oldMessages:
+				self._oldMessages.add(current.id)
+				messagesToReturn.append(current)
+			else:
+				return messagesToReturn[::-1] # dont want to return duplicate messages
+		return messagesToReturn[::-1]
+
 
 class Client:
 
@@ -175,6 +195,9 @@ class Client:
 	def sendMessageToChannel(self, channel, msg):
 		if msg != "":
 			channel.sendMessage(msg, self.token)
+
+	def getMessagesFromChannel(self, channel):
+		return channel.getMessages(self.token)
 
 	def _getAuthorization(self, email, password):
 		url = "https://discordapp.com/api/v6/auth/login"

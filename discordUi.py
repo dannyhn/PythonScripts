@@ -1,6 +1,9 @@
 import tkinter as tk
 import tkinter.scrolledtext as tkst
 import discordClient
+import string
+import time
+import threading
 
 class Application(tk.Frame):
     def __init__(self, master=None):
@@ -43,6 +46,10 @@ class Application(tk.Frame):
         self.localMaster.bind('<Return>', self.onEnterEvent)
 
         self.client = discordClient.Client(self.email, self.password)
+
+        self.messageThread = threading.Thread(target=self.getMessageThread)
+        self.messageThread.daemon = True
+        self.messageThread.start()
         #self.test()
 
     def onEnterEvent(self, event):
@@ -52,7 +59,7 @@ class Application(tk.Frame):
 
     def insertText(self, msg):
         self.text.config(state=tk.NORMAL)
-        self.text.insert(tk.INSERT, msg + "\n")
+        self.text.insert(tk.INSERT, "".join(filter(lambda x: x in string.printable, msg)) + "\n")
         self.text.config(state=tk.DISABLED)
 
     def handleCommand(self, command):
@@ -69,28 +76,44 @@ class Application(tk.Frame):
         splitCommand = command.split("/server ")
         if len(splitCommand) == 1: # get list of servers
             for name in self.client.getServerNames():
-                self.insertText(name)
+                self.insertText("Server: " + name)
         elif len(splitCommand) == 2:
             self.server = self.client.getServerByName(splitCommand[1])
             self.insertText("Connected to Server: " + self.server.getName())
+            self.displayChannel()
 
     def handleChannelCommand(self, command):
         splitCommand = command.split("/channel ")
-        if len(splitCommand) == 1: # get list of servers
-            for name in self.client.getChannelNames(self.server):
-                self.insertText(name)
+        if len(splitCommand) == 1: # get list of channels
+            self.displayChannel()
         elif len(splitCommand) == 2:
             self.channel = self.client.getChannelByName(self.server, splitCommand[1])
             self.insertText("Connected to Channel: " + self.channel.getName())
+            self.getMessages()
 
-    def test(self):
-        server = self.client.getServerByName("Teamspeak")
-        channel = self.client.getChannelByName(server, "programming")
-        self.client.sendMessageToChannel(channel, "hello world 2")
+    def getMessages(self):
+        if self.channel != None:
+            print("Getting Messages")
+            msgs = self.client.getMessagesFromChannel(self.channel)
+            for msg in msgs:
+                self.insertText("{:10} : {}".format(msg.name, msg.content))
+        else:
+            print("No Channel Set")
+
+    def displayChannel(self):
+        if self.server != None:
+            for name in self.client.getChannelNames(self.server):
+                self.insertText("Channel: " + name)
+
+    def getMessageThread(self):
+        while True:
+            self.getMessages()
+            time.sleep(20)
+
 
         
-
-root = tk.Tk()
-root.wm_title("Danny's Client")
-app = Application(master=root)
-app.mainloop()
+if __name__ == '__main__':
+    root = tk.Tk()
+    root.wm_title("Danny's Client")
+    app = Application(master=root)
+    app.mainloop()
