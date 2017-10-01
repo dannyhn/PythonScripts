@@ -59,8 +59,9 @@ def getAuthorization(email, password):
 #messageDTO = {"channel" : "272172570609188864", "message" : "hello world"}
 
 #clientPost("http://localhost:6565/message", messageDTO)
-
-#curl -H "Content-Type: application/json" -X POST -d '{"message": "asd", "channel": "315951206142967818"}' localhost:6565/message
+#https://discordapp.com/api/webhooks/319967654578225153/b2r9WX9B_5m6I-FJuNESPKv8DVJlffk5OMm1G6-g3rWqAOMbqHVbxCgPoFLn4ZYH0_4x
+#curl -X POST -d '{"content": "abc"}' https://discordapp.com/api/webhooks/319967654578225153/b2r9WX9B_5m6I-FJuNESPKv8DVJlffk5OMm1G6-g3rWqAOMbqHVbxCgPoFLn4ZYH0_4x
+#curl -H "Content-Type: application/json" -X POST -d '{"message": "I changed your names because i can", "channel": "267715169520582657"}' localhost:6565/message
 #curl -H "Content-Type: application/json" -X POST -d '{"guild":null,"guildId":null,"user":"Danny","userId":"209171660224462859","channel":null,"channelId":null,"timestamp":1495400351359,"message":"b"}' localhost:6565/messageUser
 
 class Login:
